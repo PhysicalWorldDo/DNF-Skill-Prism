@@ -1,0 +1,28 @@
+DNF Skill Prism 1.0.0 - public native core
+
+Author: 物理世界的欺骗
+https://space.bilibili.com/492488982
+https://github.com/PhysicalWorldDo/DNF-Skill-Prism
+
+miniz
+  Distributed in native/dnflib/src/miniz.c and miniz.h.
+  Copyright 2013-2014 RAD Game Tools and Valve Software.
+  Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC.
+  Copyright 2016 Martin Raiber.
+  MIT license: full notice is retained in those source files.
+
+sha256.h
+  The implementation declares itself public domain in its header.
+
+zlib and nlohmann/json
+  External build dependencies; no precompiled binaries or dependency sources
+  are copied into this repository. Preserve their original notices when
+  redistributing them. See README.md for the exact validated versions.
+
+REP resource/protocol/catalog implementation
+  Shared with the author's native REP player:
+  https://github.com/PhysicalWorldDo/rep-player
+
+Game inputs
+  No client resources, skill database DLL, shaders or UI assets are included.
+  Input file formats and game resources remain the property of their owners.
