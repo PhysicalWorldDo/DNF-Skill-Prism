@@ -28,6 +28,7 @@ public:
     int version=0;
     explicit Img(Bytes data);
     size_t count() const { return records_.size(); }
+    void validateFrames();
     size_t paletteCount()const{return palettes_.size();}
     std::optional<int> linkIndex(int index)const{if(index<0||size_t(index)>=records_.size())throw Error("IMG frame out of range");return records_[index][0]==17?std::optional<int>(records_[index][1]):std::nullopt;}
     std::shared_ptr<Frame> frame(int index,int palette=0);
@@ -38,25 +39,31 @@ public:
     using IndexPtr=std::shared_ptr<const Index>;
     using FrameTransform=std::function<std::shared_ptr<Frame>(const std::string&,int,int,std::shared_ptr<Frame>)>;
 private:
-    struct Entry {std::string package;uint32_t offset,length;};
+    struct Entry {std::string package;uint32_t offset,length;bool patch=false;};
     IndexPtr index_;
     std::filesystem::path root_;
     std::unordered_map<std::string,Entry> entries_;
     std::unordered_map<std::string,std::shared_ptr<Img>> images_;
     std::unordered_set<std::string> packages_;
+    uint64_t sourceRevision_=0;
     std::function<void(const std::string&,int)> frameObserver_;
     FrameTransform transform_;
     static IndexPtr buildIndex(std::filesystem::path root,bool patchesEnabled);
     static void indexNative(Index& index);
-    static void readPackage(const std::filesystem::path& root,const std::string& name,std::unordered_map<std::string,Entry>& entries);
+    static void readPackage(const std::filesystem::path& root,const std::string& name,std::unordered_map<std::string,Entry>& entries,bool patch=false);
     void indexPackage(const std::string& name);
     const Entry* resolve(std::string name);
+    bool skipPatch(const std::string& name);
+    bool patchSource(const std::string& name);
+    void syncSources();
+    std::shared_ptr<Frame> decodeFrame(const std::string& name,int index,int palette);
 public:
     uint64_t fallbacks=0,decodedFrames=0;
     explicit Assets(std::filesystem::path root,bool patchesEnabled=true);
     explicit Assets(IndexPtr index);
     IndexPtr index()const{return index_;}
     bool patchesEnabled()const;
+    uint64_t sourceRevision()const;
     const std::filesystem::path& root()const{return root_;}
     void clearDecodedImages(){images_.clear();}
     void setFrameTransform(FrameTransform transform){transform_=std::move(transform);}
