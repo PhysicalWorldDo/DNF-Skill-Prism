@@ -2,10 +2,32 @@
 #include "dnflib.h"
 #include <iostream>
 #include <stdexcept>
+#include <zlib.h>
 
 int failures=0;
 void check(bool passed,const char* message){std::cout<<(passed?"PASS ":"FAIL ")<<message<<'\n';if(!passed)failures++;}
+rep::Bytes pixelLengthFixture(int format,const rep::Bytes& raw){
+    rep::Bytes compressed(compressBound(uLong(raw.size())));uLongf size=compressed.size();
+    if(compress2(compressed.data(),&size,raw.data(),uLong(raw.size()),Z_DEFAULT_COMPRESSION)!=Z_OK)throw std::runtime_error("fixture compression failed");
+    compressed.resize(size);rep::Bytes bytes;const char magic[]="Neople Img File";bytes.insert(bytes.end(),magic,magic+16);
+    auto append=[&](int32_t value){auto at=bytes.size();bytes.resize(at+4);rep::put<int32_t>(bytes,at,value);};
+    for(int32_t value:{80,0,2,3,format,6,2,1,int32_t(size),-3,4,32,32,16,5,1,1,4,0,0,1,1,17,0})append(value);
+    bytes.insert(bytes.end(),compressed.begin(),compressed.end());bytes.insert(bytes.end(),{255,0,0,255});return bytes;
+}
 int main(){
+    const rep::Bytes expected{255,0,0,255,0,255,0,255};
+    for(auto [format,raw]:std::vector<std::pair<int,rep::Bytes>>{{14,{0,252,224,131}},{15,{0,255,240,240}},{16,{0,0,255,255,0,255,0,255}}}){
+        for(bool trailing:{false,true}){
+            auto payload=raw;if(trailing)payload.insert(payload.end(),{18,52,86,120,154});
+            try{rep::Img fixture(pixelLengthFixture(format,payload));auto first=fixture.frame(0);
+                check(first->cropped()==expected,trailing?"direct pixels ignore decompressed suffix":"exact direct pixel payload still decodes");
+                check(first->x==-3&&first->y==4&&first->fullWidth==32&&first->fullHeight==32,"pixel suffix preserves frame metadata");
+                check(fixture.frame(1)->cropped()==rep::Bytes({0,0,255,255})&&fixture.frame(2)->cropped()==expected,"pixel suffix preserves subsequent payload offsets and linked frames");
+            }catch(const rep::Error& error){std::cout<<error.what()<<'\n';check(false,"valid direct pixel payload decodes");}
+        }
+        raw.pop_back();bool truncated=false;try{rep::Img fixture(pixelLengthFixture(format,raw));fixture.frame(0);}catch(const rep::Error&){truncated=true;}
+        check(truncated,"short decompressed direct pixel payload is rejected");
+    }
     prism::ColorSettings settings;settings.mode="hue";settings.hue=120;settings.saturation=100;settings.intensity=100;
     rep::Bytes pixels{255,0,0,128,0,0,0,0,255,255,255,230};
     auto result=prism::recolor(pixels,3,1,settings);
