@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(DNFSkillPrismCore VERSION 1.1.2 LANGUAGES C CXX)
+project(DNFSkillPrismCore VERSION 1.1.3 LANGUAGES C CXX)
 if(NOT WIN32)
   message(FATAL_ERROR "The current resource reader uses Windows APIs. Build on Windows x64.")
 endif()
