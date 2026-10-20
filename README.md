@@ -2,19 +2,19 @@
 
 作者：**物理世界的欺骗** · [哔哩哔哩](https://space.bilibili.com/492488982)
 
-[下载 Windows 成品](https://github.com/PhysicalWorldDo/DNF-Skill-Prism/releases/latest) · [版本 1.1.1](https://github.com/PhysicalWorldDo/DNF-Skill-Prism/releases/tag/v1.1.1)
+[下载 Windows 成品](https://github.com/PhysicalWorldDo/DNF-Skill-Prism/releases/latest) · [版本 1.1.2](https://github.com/PhysicalWorldDo/DNF-Skill-Prism/releases/tag/v1.1.2)
 
 ## 成品
 
 技能原始效果与染色效果按同一条 REP 时间线同步预览。支持颜色、渐变与叠加调整，106 套内置配色、自定义配色永久保存、跨技能复用、方案保存与 NPK 补丁导出。
 
-1.1.1 成品增加首次使用交互教程，以及当前转职内的技能批量配色、一次撤销和合并 NPK 导出。批量分析只包含技能实际存在的原版或 VP 版本，不再为本来没有的 VP 生成提示行。
+1.1.2 成品增加“全选本职业 / 取消全选”切换，不受搜索和筛选影响；可逐项调整批量范围。播放速度支持 0.25–4 倍，便于查看技能细节。
 
-下载 Release 中的 `DNFSkillPrism-v1.1.1-win-x64.zip`，完整解压后运行 `dnf_skill_prism.exe`。要求 Windows 10/11 x64、Microsoft Edge WebView2 Runtime，以及自行准备的游戏客户端。不要只复制 EXE，`resources` 是运行依赖。
+下载 Release 中的 `DNFSkillPrism-v1.1.2-win-x64.zip`，完整解压后运行 `dnf_skill_prism.exe`。要求 Windows 10/11 x64、Microsoft Edge WebView2 Runtime，以及自行准备的游戏客户端。不要只复制 EXE，`resources` 是运行依赖。
 
 原始客户端只读。共享素材修改会影响所有使用它的技能。多调色板 IMG 目前支持预览，暂不支持补丁导出。
 
-当前源码的资源读取器会在补丁 IMG 读取失败、像素解码失败或缺少所需帧时，自动改读同路径客户端原始 IMG；同一资源索引下的预览和导出共用回退结果。同包内其他有效 IMG 继续使用。此更新尚未发布新的成品 Release，当前正式下载仍为 1.1.1。
+1.1.2 还修复了部分 IMG 解压数据尾部存在额外内容时的读取失败。资源读取器会在补丁 IMG 读取失败、像素解码失败或缺少所需帧时，自动改读同路径客户端原始 IMG；同一资源索引下的预览和导出共用回退结果，同包内其他有效 IMG 继续使用。
 
 ## 仓库范围
 
