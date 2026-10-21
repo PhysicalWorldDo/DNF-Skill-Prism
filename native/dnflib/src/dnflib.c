@@ -11,6 +11,8 @@
 #include "pixel.h"
 #include "dxt.h"
 #include "palette.h"
+#define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+#include "miniz.h"
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
@@ -144,15 +146,74 @@ DNFLIB_API DnfError dnf_img_create(ImgFile **out) {
     return DNF_OK;
 }
 
+DNFLIB_API DnfError dnf_img_create_paletted(const uint8_t *rgba,
+                                            int palette_count, int color_count,
+                                            ImgFile **out) {
+    if (!out) return DNF_ERR_INVALID_FORMAT;
+    *out = NULL;
+    if (!rgba || palette_count < 1 || palette_count > IMG_MAX_PALETTES ||
+        color_count < 1 || color_count > DNF_PALETTE_MAX)
+        return DNF_ERR_INVALID_FORMAT;
+    ImgFile *img = NULL;
+    DnfError e = dnf_img_create(&img);
+    if (e) return e;
+    ImgPriv *priv = (ImgPriv *)img->_priv;
+    priv->palettes = (ColorBoard *)calloc((size_t)palette_count, sizeof(ColorBoard));
+    if (!priv->palettes) { dnf_img_free(img); return DNF_ERR_OOM; }
+    priv->palette_count = palette_count;
+    for (int p = 0; p < palette_count; p++) {
+        ColorBoard *cb = &priv->palettes[p]; cb->count = color_count;
+        for (int c = 0; c < color_count; c++) {
+            const uint8_t *color = rgba + ((size_t)p * color_count + c) * 4;
+            cb->r[c] = color[0]; cb->g[c] = color[1];
+            cb->b[c] = color[2]; cb->a[c] = color[3];
+        }
+    }
+    img->version = IMG_VER6; *out = img; return DNF_OK;
+}
+
+DNFLIB_API DnfError dnf_img_add_frame_indices(ImgFile *img,
+                                               const uint8_t *indices,
+                                               int w, int h,
+                                               int x, int y, int mw, int mh) {
+    if (!img || !indices || img->version != IMG_VER6 || !img->_priv ||
+        w <= 0 || h <= 0 || mw <= 0 || mh <= 0 ||
+        img->frame_count < 0 || img->frame_count >= IMG_MAX_SPRITES ||
+        (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return DNF_ERR_INVALID_FORMAT;
+    ImgPriv *priv = (ImgPriv *)img->_priv;
+    if (!priv->palettes || priv->palette_count <= 0) return DNF_ERR_INVALID_FORMAT;
+    const size_t count = (size_t)w * h;
+    for (size_t i = 0; i < count; i++)
+        if (indices[i] >= priv->palettes[0].count) return DNF_ERR_INVALID_INDEX;
+    mz_ulong length = mz_compressBound((mz_ulong)count);
+    uint8_t *data = (uint8_t *)malloc(length);
+    if (!data) return DNF_ERR_OOM;
+    if (mz_compress2(data, &length, indices, (mz_ulong)count, 6) != MZ_OK || length > INT32_MAX) {
+        free(data); return DNF_ERR_INVALID_FORMAT;
+    }
+    ImageFrame *frames = (ImageFrame *)realloc(img->frames, ((size_t)img->frame_count + 1) * sizeof(ImageFrame));
+    if (!frames) { free(data); return DNF_ERR_OOM; }
+    img->frames = frames;
+    ImageFrame *frame = &frames[img->frame_count++]; memset(frame, 0, sizeof(*frame));
+    frame->format = DNF_FMT_ARGB_1555; frame->compress = DNF_COMPRESS_ZLIB;
+    frame->w = w; frame->h = h; frame->x = x; frame->y = y;
+    frame->mw = mw; frame->mh = mh; frame->data = data;
+    frame->data_size = (int32_t)length; frame->link_index = -1;
+    return DNF_OK;
+}
+
 DNFLIB_API DnfError dnf_img_add_frame_rgba(ImgFile *img,
                                             const uint8_t *rgba,
                                             int w, int h,
                                             int x, int y, int mw, int mh,
                                             DnfImageFormat format,
                                             DnfCompressMode compress) {
-    if (!img || !rgba || img->version != IMG_VER2 ||
+    if (!img || !rgba || (img->version != IMG_VER2 && img->version != IMG_VER6) ||
         w <= 0 || h <= 0 || mw <= 0 || mh <= 0 ||
         img->frame_count < 0 || img->frame_count == INT_MAX)
+        return DNF_ERR_INVALID_FORMAT;
+    if (img->version == IMG_VER6 && format != DNF_FMT_ARGB_8888)
         return DNF_ERR_INVALID_FORMAT;
     if (format != DNF_FMT_ARGB_1555 &&
         format != DNF_FMT_ARGB_4444 &&
@@ -205,7 +266,7 @@ DNFLIB_API DnfError dnf_img_add_frame_rgba(ImgFile *img,
 }
 
 DNFLIB_API DnfError dnf_img_add_link_frame(ImgFile *img, int link_index) {
-    if (!img || img->version != IMG_VER2 ||
+    if (!img || (img->version != IMG_VER2 && img->version != IMG_VER6) ||
         link_index < 0 || link_index >= img->frame_count ||
         img->frame_count == INT_MAX)
         return DNF_ERR_INVALID_INDEX;

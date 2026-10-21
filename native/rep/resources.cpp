@@ -118,14 +118,14 @@ std::shared_ptr<Frame> Img::frameInner(int index,int palette,std::unordered_set<
     return frames_[key]=f;
 }
 std::shared_ptr<Frame> Img::frame(int index,int palette){std::unordered_set<int> visiting;return frameInner(index,palette,visiting);}
-void Img::validateFrames(){
+void Img::validateFrames(std::optional<int> palette){
     for(size_t i=0;i<records_.size();++i){
         if(records_[i][0]==17){
             std::unordered_set<int> visiting;int target=int(i);
             while(true){if(target<0||size_t(target)>=records_.size())throw Error("IMG link target out of range");
                 if(!visiting.insert(target).second)throw Error("linked IMG frame cycle");
                 if(records_[target][0]!=17)break;target=records_[target][1];}
-        }else{frame(int(i));frames_.clear();}
+        }else{for(size_t p=palette?size_t(*palette):0,end=palette?size_t(*palette)+1:std::max<size_t>(1,palettes_.size());p<end;p++){frame(int(i),int(p));frames_.clear();}}
     }
     atlasTextures_.clear();
 }
@@ -214,8 +214,47 @@ bool Assets::skipPatch(const std::string& name){
     {std::lock_guard lock(index_->rejected->mutex);if(index_->rejected->paths.insert(name).second)++index_->rejected->revision;}
     syncSources();return true;
 }
+static std::optional<std::pair<std::string,int>> paletteImagePath(std::string name){
+    // CN 148BECF00 retries an absent pack through 148BEBD10. The last
+    // four-character numeric run encodes a two-digit palette in its tail:
+    // katana0111b.img -> katana0100b.img, palette 11. Exact packs win.
+    size_t run=0;
+    for(size_t end=name.size();end>0;){
+        auto c=static_cast<unsigned char>(name[--end]);
+        if(c<'0'||c>';'){run=0;continue;}
+        if(++run==4){
+            auto pos=end+2;int palette=0;
+            for(size_t i=pos;i<pos+2&&name[i]>='0'&&name[i]<='9';++i)palette=palette*10+name[i]-'0';
+            auto original=name;name.replace(pos,2,"00");
+            if(palette>0&&name!=original)return std::pair{std::move(name),palette};
+            return {};
+        }
+    }
+    return {};
+}
+std::optional<Assets::ImageAlias> Assets::imageAlias(const std::string& name,int palette){
+    if(auto alias=paletteImagePath(name);alias&&resolve(alias->first))return ImageAlias{alias->first,alias->second};
+    // Newer CN UI packs may retain only the (2x) entry. Keep its pixels
+    // at full resolution while drawing its geometry in logical UI units.
+    // This is a compatibility lookup, independent of July palette aliases.
+    if(name.starts_with("sprite/interface/")){
+        auto base=name.find_last_of('/')+1;
+        if(name.compare(base,4,"(2x)")!=0){auto hd=name;hd.insert(base,"(2x)");return ImageAlias{std::move(hd),palette,.5f};}
+    }
+    return {};
+}
+std::pair<std::string,std::shared_ptr<Img>> Assets::inspectImage(std::string logical){
+    auto name=normalize(logical);auto img=preload(name);if(img)return {name,std::move(img)};
+    if(auto alias=imageAlias(name,0))return inspectImage(alias->path);
+    return {name,{}};
+}
 std::shared_ptr<Frame> Assets::decodeFrame(const std::string& name,int index,int palette){
-    const bool patch=patchSource(name);auto img=preload(name);if(!img)return {};
+    const bool patch=patchSource(name);auto img=preload(name);
+    if(!img){
+        auto alias=imageAlias(name,palette);if(!alias)return {};
+        auto source=decodeFrame(alias->path,index,alias->palette);if(!source||alias->geometryScale==1)return source;
+        auto logical=std::make_shared<Frame>(*source);logical->geometryScale=alias->geometryScale;return logical;
+    }
     if(index>=0&&size_t(index)<img->count()){
         try{return img->frame(index,palette);}
         catch(const Error&){if(patch){skipPatch(name);return decodeFrame(name,index,palette);}throw;}
@@ -246,5 +285,21 @@ std::shared_ptr<Frame> Assets::frame(std::string logical,int index,int palette,b
 Bytes Assets::rawImage(std::string logical){
     auto name=normalize(logical);preload(name);
     auto entry=resolve(name);if(!entry)throw Error("IMG not found: "+logical);std::ifstream stream(root_/wide(entry->package),std::ios::binary);if(!stream)throw Error("NPK file absent: "+entry->package);Bytes bytes(entry->length);stream.seekg(entry->offset);stream.read(reinterpret_cast<char*>(bytes.data()),bytes.size());if(!stream)throw Error("Truncated IMG entry: "+logical);return bytes;}
+Assets::ExportSource Assets::exportSource(std::string logical,std::optional<int> palette){
+    auto name=normalize(logical);if(auto img=preload(name)){
+        if(patchSource(name)){
+            try{img->validateFrames(palette);}
+            catch(const Error&){skipPatch(name);return exportSource(name,palette);}
+            catch(const std::out_of_range&){skipPatch(name);return exportSource(name,palette);}
+        }
+        return {name,rawImage(name),palette};
+    }
+    if(auto alias=imageAlias(name,0)){
+        auto source=exportSource(alias->path,alias->geometryScale==1?std::optional<int>(alias->palette):palette);
+        if(alias->geometryScale==1){source.entryPath=name;source.palette=alias->palette;}
+        return source;
+    }
+    throw Error("IMG not found: "+logical);
+}
 std::string Assets::sourcePackage(std::string logical){auto entry=resolve(normalize(logical));return entry?entry->package:std::string{};}
 }

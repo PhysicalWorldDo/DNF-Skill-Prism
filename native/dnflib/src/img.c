@@ -569,7 +569,7 @@ DnfError img_open(DnfIO *io, ImgFile **out) {
 
 /* ------------------------------------------------------------------ */
 /* img_save (Ver2 layout)                                             */
-/* Only Ver2 write is implemented; other versions save as Ver2.       */
+/* Ver2 direct frames and Ver6 indexed frames with multiple palettes. */
 /* ------------------------------------------------------------------ */
 DnfError img_save(DnfIO *io, ImgFile *img) {
     if (!io || !img || img->frame_count < 0 ||
@@ -594,10 +594,16 @@ DnfError img_save(DnfIO *io, ImgFile *img) {
     }
     if ((e = dnf_io_write_i32(io, header_sz))) return e;
     if ((e = dnf_io_write_i32(io, priv ? priv->keep : 0))) return e;
-    /* This writer emits the Ver2 layout, so its header must also identify
-     * Ver2 even when the in-memory object originated from another version. */
-    if ((e = dnf_io_write_i32(io, IMG_VER2))) return e;
+    /* V6 adds palette boards before the same frame table; other input
+     * versions are normalized to the direct Ver2 layout. */
+    const int paletted = img->version == IMG_VER6 && priv && priv->palette_count > 0;
+    if ((e = dnf_io_write_i32(io, paletted ? IMG_VER6 : IMG_VER2))) return e;
     if ((e = dnf_io_write_i32(io, img->frame_count))) return e;
+    if (paletted) {
+        if ((e = dnf_io_write_i32(io, priv->palette_count))) return e;
+        for (i = 0; i < priv->palette_count; i++)
+            if ((e = palette_write(io, &priv->palettes[i]))) return e;
+    }
 
     /* Write frame headers */
     for (i = 0; i < img->frame_count; i++) {

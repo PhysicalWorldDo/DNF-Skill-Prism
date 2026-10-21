@@ -137,6 +137,16 @@ DNFLIB_API DnfError dnf_img_open_file(const char *path, ImgFile **out);
 DNFLIB_API DnfError dnf_img_open_mem(const uint8_t *buf, size_t len, ImgFile **out);
 /* Create a new empty Ver2 IMG. */
 DNFLIB_API DnfError dnf_img_create(ImgFile **out);
+/* Create a Ver6 IMG. rgba is palette-major, color_count RGBA entries per
+ * palette; both counts are in 1..256. Palette ordinals are preserved. */
+DNFLIB_API DnfError dnf_img_create_paletted(const uint8_t *rgba,
+                                            int palette_count, int color_count,
+                                            ImgFile **out);
+/* Append a ZLIB-compressed one-byte index frame to a Ver6 IMG. */
+DNFLIB_API DnfError dnf_img_add_frame_indices(ImgFile *img,
+                                               const uint8_t *indices,
+                                               int w, int h,
+                                               int x, int y, int mw, int mh);
 /* Append a copied RGBA frame. The first writer supports direct ARGB formats
  * with NONE or ZLIB compression. */
 DNFLIB_API DnfError dnf_img_add_frame_rgba(ImgFile *img,

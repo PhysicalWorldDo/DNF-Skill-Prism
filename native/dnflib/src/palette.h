@@ -24,7 +24,7 @@ typedef struct {
     int      count;
 } ColorBoard;
 
-/* Read a ColorBoard from IO: color_count(i32) + count*4B (BGRA) */
+/* Read a ColorBoard from IO: color_count(i32) + count*4B (RGBA) */
 DnfError palette_read(DnfIO *io, ColorBoard *cb);
 
 /* Write a ColorBoard to IO */

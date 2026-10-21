@@ -10,6 +10,7 @@ struct Frame {
     std::string actualPath;
     int actualFrame=-1;
     int x=0,y=0,width=0,height=0,fullWidth=0,fullHeight=0;
+    float geometryScale=1; // logical REP units per source pixel; 0.5 for a 2x UI alias
     bool empty=false,rotated=false,atlas=false;
     std::array<int,4> rect{};
     std::shared_ptr<Pixels> texture;
@@ -28,7 +29,7 @@ public:
     int version=0;
     explicit Img(Bytes data);
     size_t count() const { return records_.size(); }
-    void validateFrames();
+    void validateFrames(std::optional<int> palette=0);
     size_t paletteCount()const{return palettes_.size();}
     std::optional<int> linkIndex(int index)const{if(index<0||size_t(index)>=records_.size())throw Error("IMG frame out of range");return records_[index][0]==17?std::optional<int>(records_[index][1]):std::nullopt;}
     std::shared_ptr<Frame> frame(int index,int palette=0);
@@ -56,6 +57,8 @@ private:
     bool skipPatch(const std::string& name);
     bool patchSource(const std::string& name);
     void syncSources();
+    struct ImageAlias {std::string path;int palette=0;float geometryScale=1;};
+    std::optional<ImageAlias> imageAlias(const std::string& name,int palette);
     std::shared_ptr<Frame> decodeFrame(const std::string& name,int index,int palette);
 public:
     uint64_t fallbacks=0,decodedFrames=0;
@@ -68,12 +71,18 @@ public:
     void clearDecodedImages(){images_.clear();}
     void setFrameTransform(FrameTransform transform){transform_=std::move(transform);}
     Bytes rawImage(std::string logical);
+    struct ExportSource {std::string entryPath;Bytes bytes;std::optional<int> palette;};
+    // Numeric aliases become exact selected-palette entries; UI aliases keep
+    // their physical (2x) name so the recorded logical geometry stays intact.
+    ExportSource exportSource(std::string logical,std::optional<int> palette={});
     std::string sourcePackage(std::string logical);
     using FrameObserver=std::function<void(const std::string&,int)>;
     FrameObserver frameObserver()const{return frameObserver_;}
     void setFrameObserver(FrameObserver observer){frameObserver_=std::move(observer);}
     void notifyFrame(const std::string& path,int index){if(frameObserver_)frameObserver_(path,index);}
     std::shared_ptr<Img> preload(std::string logical);
+    // Preview metadata follows playback aliases; rawImage remains exact for export.
+    std::pair<std::string,std::shared_ptr<Img>> inspectImage(std::string logical);
     std::shared_ptr<Frame> frame(std::string logical,int index,int palette=0,bool fallback=true);
 };
 }

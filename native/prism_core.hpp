@@ -25,7 +25,9 @@ std::string imageKey(std::string value);
 using FrameTransform=std::function<std::shared_ptr<rep::Frame>(const std::string&,int,int,std::shared_ptr<rep::Frame>)>;
 FrameTransform makeTransform(std::shared_ptr<const DyeSnapshot> snapshot);
 struct BakeResult {rep::Bytes bytes;bool changed=false;int sourceVersion=0;};
-BakeResult bakeImg(std::span<const uint8_t> bytes,const ColorSettings& settings);
+// Default exports all palettes. An explicit palette materializes the exact
+// legacy numeric alias as a direct IMG, retaining its palette identity.
+BakeResult bakeImg(std::span<const uint8_t> bytes,const ColorSettings& settings,std::optional<int> palette={});
 struct PatchResult {std::filesystem::path path;uint64_t entries=0,bytes=0;std::vector<std::string> paths;};
 PatchResult writePatch(rep::Assets& assets,const DyeSnapshot& snapshot,const std::filesystem::path& output,bool modifiedOnly=true,const std::function<bool()>& cancelled={},const std::function<void(size_t,size_t)>& progress={});
 struct Skill {
