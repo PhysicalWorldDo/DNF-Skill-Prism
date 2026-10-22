@@ -77,6 +77,14 @@ void aliasExportTests(){
         check(output.preload(hd)&&!output.preload(ui)&&output.frame(ui,0,0,false)->geometryScale==.5f,"2x alias export keeps the physical 2x path and logical half geometry");
         check(result.entries==2,"aliases with the same physical source and recipe are deduplicated");
         recipe.rules[hd].hue=240;bool conflict=false;auto conflictFile=folder/"output"/"!conflict.npk";try{prism::writePatch(source,recipe,conflictFile);}catch(const rep::Error&){conflict=true;}check(conflict&&!std::filesystem::exists(conflictFile),"conflicting physical 2x recipes fail before a patch is written");
+        const auto prior=recipe.rules;auto originals=prism::undyedSnapshot({base,alias,ui,hd});
+        auto originalPatch=prism::writePatch(source,originals,folder/"originals"/"!original.npk",false);
+        std::filesystem::copy_file(packs/"!fixture.npk",folder/"originals"/"sprite_boundary.npk");rep::Assets uncolored(folder/"originals");
+        check(originalPatch.entries==3&&uncolored.rawImage(base)==bytes&&uncolored.rawImage(hd)==uiBytes,"undyed NPK includes unmodified selections and retains exact direct and multi-palette IMG bytes");
+        check(uncolored.frame(alias,1,0,false)->cropped()==before->cropped(),"undyed NPK materializes the selected weapon palette without recoloring");
+        check(recipe.rules==prior,"exporting an undyed snapshot leaves the existing dyed recipe intact");
+        bool empty=false;try{prism::writePatch(source,originals,folder/"empty.npk");}catch(const rep::Error&){empty=true;}
+        check(empty&&!std::filesystem::exists(folder/"empty.npk"),"modified-only export still omits unchanged originals");
         auto broken=multiPaletteFixture(11);dnf_npk_create(&package);dnf_npk_add_entry(package,base.c_str(),broken.data(),int(broken.size()));dnf_npk_save_file(rep::utf8((packs/"!bad.npk").wstring()).c_str(),package,0);dnf_npk_free(package);
         rep::Assets badSource(packs),shared(badSource.index());auto validAlias=badSource.exportSource("sprite/character/swordman/equipment/weapon/katana/katana0101b.img");
         check(validAlias.palette==1&&badSource.sourceRevision()==0,"selected alias export validates only the required palette, keeping valid patches");
@@ -86,6 +94,17 @@ void aliasExportTests(){
     }catch(const std::exception& e){std::cout<<e.what()<<'\n';check(false,"selected compatibility aliases export successfully");}
 }
 int main(){
+    {
+        const rep::Bytes pixels{80,140,210,128,0,0,0,0,255,255,255,230,10,30,60,255};
+        for(auto overlay:{"none","outer_glow","lightning","starlight","sakura"}){
+            prism::ColorSettings original;original.mode="none";original.overlay=overlay;original.brightness=170;original.saturation=190;original.intensity=100;original.preserveAlpha=false;
+            check(prism::recolor(pixels,2,2,original)==pixels,"original pixel mode bypasses brightness, overlays and alpha edits");
+            auto bytes=multiPaletteFixture();auto baked=prism::bakeImg(bytes,original);
+            check(!baked.changed&&baked.bytes==bytes,"original mode retains exact multi-palette IMG bytes with stale overlays");
+            auto alias=prism::bakeImg(bytes,original,11);rep::Img source(bytes),out(alias.bytes);
+            check(out.frame(1)->cropped()==source.frame(1,11)->cropped(),"original weapon alias retains its actual palette pixels");
+        }
+    }
     multiPaletteTests();
     aliasExportTests();
     const rep::Bytes expected{255,0,0,255,0,255,0,255};

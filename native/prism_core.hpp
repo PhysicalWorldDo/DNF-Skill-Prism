@@ -21,6 +21,7 @@ ColorSettings colorSettings(const Json& value);
 Json colorJson(const ColorSettings& settings);
 rep::Bytes recolor(std::span<const uint8_t> rgba,int width,int height,const ColorSettings& settings);
 struct DyeSnapshot {uint64_t revision=0;std::map<std::string,ColorSettings> rules;};
+DyeSnapshot undyedSnapshot(const std::vector<std::string>& selected);
 std::string imageKey(std::string value);
 using FrameTransform=std::function<std::shared_ptr<rep::Frame>(const std::string&,int,int,std::shared_ptr<rep::Frame>)>;
 FrameTransform makeTransform(std::shared_ptr<const DyeSnapshot> snapshot);

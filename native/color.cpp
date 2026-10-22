@@ -28,7 +28,7 @@ ColorSettings colorSettings(const Json& value){
 Json colorJson(const ColorSettings& s){return {{"mode",s.mode},{"colors",s.colors},{"hue",s.hue},{"saturation",s.saturation},{"brightness",s.brightness},{"intensity",s.intensity},{"preserveAlpha",s.preserveAlpha},{"preserveBlack",s.preserveBlack},{"preserveHighlight",s.preserveHighlight},{"overlay",s.overlay},{"density",s.density},{"scale",s.scale},{"frequency",s.frequency},{"offset",s.offset},{"seed",s.seed}};}
 rep::Bytes recolor(std::span<const uint8_t> rgba,int width,int height,const ColorSettings& s){
     if(width<=0||height<=0||rgba.size()!=size_t(width)*height*4)throw rep::Error("Invalid RGBA frame dimensions");
-    rep::Bytes output(rgba.begin(),rgba.end());if(s.intensity==0||(s.mode=="none"&&s.overlay=="none"))return output;
+    rep::Bytes output(rgba.begin(),rgba.end());if(s.intensity==0||s.mode=="none")return output;
     std::vector<RGB> colors;for(auto& color:s.colors)colors.push_back(hex(color));double blend=s.intensity/100;
     auto source=[&](int x,int y,int c)->double{if(x<0||x>=width||y<0||y>=height)return 0;return rgba[(size_t(y)*width+x)*4+c];};
     for(int y=0;y<height;y++)for(int x=0;x<width;x++){

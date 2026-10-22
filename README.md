@@ -2,19 +2,21 @@
 
 作者：**物理世界的欺骗** · [哔哩哔哩](https://space.bilibili.com/492488982)
 
-[下载 Windows 成品](https://github.com/PhysicalWorldDo/DNF-Skill-Prism/releases/latest) · [版本 1.1.5](https://github.com/PhysicalWorldDo/DNF-Skill-Prism/releases/tag/v1.1.5)
+[下载 Windows 成品](https://github.com/PhysicalWorldDo/DNF-Skill-Prism/releases/latest) · [版本 1.1.6](https://github.com/PhysicalWorldDo/DNF-Skill-Prism/releases/tag/v1.1.6)
 
 ## 成品
 
 技能原始效果与染色效果按同一条 REP 时间线同步预览。支持颜色、渐变与叠加调整，106 套内置配色、自定义配色永久保存、跨技能复用、方案保存与 NPK 补丁导出。
 
-1.1.5 支持多调色板 IMG 染色和补丁导出，保留调色板编号、帧序号、链接、偏移和透明度；旧武器数字路径按对应调色板导出，隐式 2x 界面资源保持高清像素与逻辑尺寸。素材列表新增取消全选及 Shift 连续选择，全选和取消均作用于当前页签及筛选结果。同步国服录像编码、字体布局、绘制颜色和裁剪兼容修复。
+1.1.6 修复批量配色确认窗口的摘要，分别显示实际染色方式与配色名称、已修改状态。“原始像素”模式完整保留原像素，跳过亮度、透明度和纹理叠加。导出窗口新增“导出未染色技能”，按当前技能或批量所选范围生成未染色 NPK，无需先应用配色，也不改变工作台中的方案。原始像素取自当前加载的素材，不会自动移除客户端中已有的有效补丁。
+
+保留 1.1.5 的多调色板 IMG 导出、旧武器调色板与 2x 资源兼容、素材全选/取消及 Shift 连续选择，以及国服录像兼容修复。
 
 技能自动关联仅扫描所选客户端的 `Replay/SkillReplay`，按职业和原版／VP1／VP2 匹配；缺少该目录时会明确提示。已包含 1.1.3 的黑暗武士 `DrawSword` 录像误匹配修复。
 
 支持“全选本职业 / 取消全选”切换，不受搜索和筛选影响；可逐项调整批量范围。播放速度支持 0.25–4 倍，便于查看技能细节。
 
-下载 Release 中的 `DNFSkillPrism-v1.1.5-win-x64.zip`，完整解压后运行 `dnf_skill_prism.exe`。要求 Windows 10/11 x64、Microsoft Edge WebView2 Runtime，以及自行准备的游戏客户端。不要只复制 EXE，`resources` 是运行依赖。
+下载 Release 中的 `DNFSkillPrism-v1.1.6-win-x64.zip`，完整解压后运行 `dnf_skill_prism.exe`。要求 Windows 10/11 x64、Microsoft Edge WebView2 Runtime，以及自行准备的游戏客户端。不要只复制 EXE，`resources` 是运行依赖。
 
 原始客户端只读。共享素材修改会影响所有使用它的技能。多调色板 IMG 支持染色与补丁导出，保留调色板编号、帧链接和偏移。空间特效结果超出 V6 的 256 组索引颜色时会提示调整参数，不做有损替换。
 
