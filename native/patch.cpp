@@ -40,8 +40,7 @@ static BakeResult bakePalettes(rep::Img& original,std::span<const uint8_t> bytes
     for(size_t i=0;i<frames.size();i++)if(frames[i].link){auto& f=raw->frames[i];dnf_free(f.data);f.data=nullptr;f.data_size=0;f.format=DNF_FMT_LINK;f.link_index=*frames[i].link;}
     uint8_t* encoded=nullptr;size_t size=0;nativeCheck(dnf_img_save_mem(raw,&encoded,&size),"Serialize V6 IMG");std::unique_ptr<uint8_t,decltype(&dnf_free)> owned(encoded,dnf_free);return {{encoded,encoded+size},true,original.version};
 }
-BakeResult bakeImg(std::span<const uint8_t> bytes,const ColorSettings& settings,std::optional<int> palette){
-    rep::Img original(rep::Bytes(bytes.begin(),bytes.end()));
+static BakeResult bakeImg(rep::Img& original,std::span<const uint8_t> bytes,const ColorSettings& settings,std::optional<int> palette){
     if(!palette&&original.paletteCount()>1)return bakePalettes(original,bytes,settings);
     ImgFile* raw=nullptr;nativeCheck(dnf_img_create(&raw),"Create IMG");std::unique_ptr<ImgFile,decltype(&dnf_img_free)> destination(raw,dnf_img_free);
     bool changed=false;std::vector<std::pair<int,int>> links;
@@ -54,11 +53,15 @@ BakeResult bakeImg(std::span<const uint8_t> bytes,const ColorSettings& settings,
     for(auto [index,target]:links){auto& frame=destination->frames[index];dnf_free(frame.data);frame.data=nullptr;frame.data_size=0;frame.format=DNF_FMT_LINK;frame.link_index=target;}
     uint8_t* encoded=nullptr;size_t size=0;nativeCheck(dnf_img_save_mem(destination.get(),&encoded,&size),"Serialize IMG");std::unique_ptr<uint8_t,decltype(&dnf_free)> owned(encoded,dnf_free);return {{encoded,encoded+size},changed,original.version};
 }
+BakeResult bakeImg(std::span<const uint8_t> bytes,const ColorSettings& settings,std::optional<int> palette){
+    rep::Img original(rep::Bytes(bytes.begin(),bytes.end()));
+    return bakeImg(original,bytes,settings,palette);
+}
 PatchResult writePatch(rep::Assets& assets,const DyeSnapshot& snapshot,const std::filesystem::path& output,bool modifiedOnly,const std::function<bool()>& cancelled,const std::function<void(size_t,size_t)>& progress){
     if(snapshot.rules.empty())throw rep::Error("请选择需要染色的 IMG 素材");if(std::filesystem::exists(output))throw rep::Error("导出文件已存在，请使用新文件名");
     auto destination=std::filesystem::absolute(output).lexically_normal(),client=std::filesystem::absolute(assets.root().parent_path()).lexically_normal();auto relative=destination.lexically_relative(client);if(!relative.empty()&&*relative.begin()!=L"..")throw rep::Error("请导出到客户端目录之外，原始客户端只读");
     NpkFile* raw=nullptr;nativeCheck(dnf_npk_create(&raw),"Create NPK");std::unique_ptr<NpkFile,decltype(&dnf_npk_free)> npk(raw,dnf_npk_free);PatchResult result;result.path=destination;
-    std::map<std::string,ColorSettings> emitted;size_t processed=0;for(auto& [path,settings]:snapshot.rules){if(cancelled&&cancelled())throw rep::Error("导出已取消");auto source=assets.exportSource(path);if(auto prior=emitted.find(source.entryPath);prior!=emitted.end()){if(prior->second!=settings)throw rep::Error("同一实际 IMG 的染色参数冲突："+source.entryPath);if(progress)progress(++processed,snapshot.rules.size());continue;}emitted[source.entryPath]=settings;auto baked=bakeImg(source.bytes,settings,source.palette);if(baked.changed||!modifiedOnly){nativeCheck(dnf_npk_add_entry(npk.get(),source.entryPath.c_str(),baked.bytes.data(),int32_t(baked.bytes.size())),"Append NPK entry");result.paths.push_back(source.entryPath);result.entries++;}if(progress)progress(++processed,snapshot.rules.size());}
+    std::map<std::string,ColorSettings> emitted;size_t processed=0;for(auto& [path,settings]:snapshot.rules){if(cancelled&&cancelled())throw rep::Error("导出已取消");auto source=assets.exportSource(path);if(auto prior=emitted.find(source.entryPath);prior!=emitted.end()){if(prior->second!=settings)throw rep::Error("同一实际 IMG 的染色参数冲突："+source.entryPath);if(progress)progress(++processed,snapshot.rules.size());continue;}emitted[source.entryPath]=settings;auto original=assets.openImage(source.bytes);auto baked=bakeImg(original,source.bytes,settings,source.palette);if(baked.changed||!modifiedOnly){nativeCheck(dnf_npk_add_entry(npk.get(),source.entryPath.c_str(),baked.bytes.data(),int32_t(baked.bytes.size())),"Append NPK entry");result.paths.push_back(source.entryPath);result.entries++;}if(progress)progress(++processed,snapshot.rules.size());}
     if(!result.entries)throw rep::Error("当前参数没有改变任何像素，未生成空补丁");
     std::filesystem::create_directories(destination.parent_path());auto temporary=destination;temporary+=L".partial";
     if(std::filesystem::exists(temporary))throw rep::Error("临时导出文件已存在，请更换文件名");

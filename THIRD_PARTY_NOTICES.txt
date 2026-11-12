@@ -1,4 +1,4 @@
-DNF Skill Prism 1.1.3 - public native core
+DNF Skill Prism 1.2.0 - public native core
 
 Author: 物理世界的欺骗
 https://space.bilibili.com/492488982
@@ -22,6 +22,13 @@ zlib and nlohmann/json
 REP resource/protocol/catalog implementation
   Shared with the author's native REP player:
   https://github.com/PhysicalWorldDo/rep-player
+
+BC7 image decoding
+  bcdec by Sergii Kudlai, MIT license, revision
+  80859ed3b7afb1c527a2a99d70c61457bea72d0c (https://github.com/iOrange/bcdec).
+  BC7Prep inverse transform adapted from the DNF DB Reader port of
+  CUE4Parse BC7PrepDecoder (Apache-2.0). See native/vendor for both notices.
+  Oodle uses the selected client's oo2core_9_win64.dll.
 
 Game inputs
   No client resources, skill database DLL, shaders or UI assets are included.

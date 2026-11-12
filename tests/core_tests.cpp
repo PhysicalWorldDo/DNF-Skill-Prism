@@ -93,7 +93,80 @@ void aliasExportTests(){
 
     }catch(const std::exception& e){std::cout<<e.what()<<'\n';check(false,"selected compatibility aliases export successfully");}
 }
+static rep::Bytes bc7AtlasFixture(uint32_t dxgi, bool prep, bool zipped){
+    rep::Bytes dds{'D','D','S',' '};
+    dds.resize(148);
+    for(auto [offset,value]:std::initializer_list<std::pair<size_t,uint32_t>>{
+            {4,124},{8,0x81007},{12,4},{16,8},{20,32},{28,1},
+            {76,32},{80,4},{84,0x30315844},{108,0x1000},{128,dxgi},{132,3},{140,1}})
+        rep::put(dds,offset,value);
+    auto appendWord=[](rep::Bytes& bytes,int32_t value){
+        auto offset=bytes.size();
+        bytes.resize(offset+4);
+        rep::put(bytes,offset,value);
+    };
+    if(prep){
+        for(int word:{0x7bc,0,0,0,0,0,0,0,0,0,2,0})appendWord(dds,word);
+    }
+    for(const auto& color:{std::array{120,32,8,127},std::array{8,64,112,96}}){
+        // BC7 mode 6 with equal endpoints, zero p-bits and zero indices.
+        std::array<uint8_t,16> block{1<<6};
+        for(int channel=0;channel<4;++channel)for(int endpoint=0;endpoint<2;++endpoint)
+            for(int bit=0;bit<7;++bit){
+                int offset=7+(channel*2+endpoint)*7+bit;
+                block[offset/8]|=((color[channel]>>bit)&1)<<(offset%8);
+            }
+        dds.insert(dds.end(),block.begin(),block.end());
+    }
+    if(prep)dds.push_back(0x88); // Prep mode 8 carries standard BC7 blocks.
+    auto payload=dds;
+    if(zipped){
+        uLongf size=compressBound(uLong(dds.size()));
+        payload.resize(size);
+        if(compress2(payload.data(),&size,dds.data(),uLong(dds.size()),Z_DEFAULT_COMPRESSION)!=Z_OK)
+            throw std::runtime_error("fixture compression failed");
+        payload.resize(size);
+    }
+    const char magic[]="Neople Img File";
+    rep::Bytes img(magic,magic+16);
+    for(int word:{72,0,5,2,1,0,0,0,24,0,int(payload.size()),int(dds.size()),8,4,
+                  24,7,3,2,0,2,3,20,21,0,0,3,0,5,3,1,17,0})
+        appendWord(img,word);
+    img.insert(img.end(),payload.begin(),payload.end());
+    return img;
+}
+
+static void bc7AtlasTests(){
+    const rep::Bytes expected{16,128,224,192,16,128,224,192,16,128,224,192,
+                              240,64,16,254,240,64,16,254,240,64,16,254};
+    const std::array cases{
+        std::tuple{98u,false,true,"zlib BC7 UNORM atlas"},
+        std::tuple{99u,false,false,"raw BC7 SRGB atlas"},
+        std::tuple{98u,true,true,"zlib BC7Prep atlas"},
+    };
+    for(auto [dxgi,prep,zipped,label]:cases){
+        auto source=bc7AtlasFixture(dxgi,prep,zipped);
+        try{
+            rep::Img img(source);
+            auto frame=img.frame(1);
+            check(frame->cropped()==expected&&frame->x==2&&frame->y==3&&
+                  frame->fullWidth==20&&frame->fullHeight==21&&frame->texture->logicalWidth==8,label);
+            prism::ColorSettings settings;
+            settings.mode="hue";settings.hue=120;settings.intensity=100;
+            auto baked=prism::bakeImg(source,settings);
+            rep::Img reopened(baked.bytes);
+            check(baked.changed&&reopened.linkIndex(1)==0&&
+                  reopened.frame(1)->cropped()==prism::recolor(expected,3,2,settings),
+                  "BC7 dye export preserves the linked frame and cropped pixels");
+        }catch(const std::exception& error){
+            std::cout<<error.what()<<'\n';
+            check(false,label);
+        }
+    }
+}
+
 int main(){
+    bc7AtlasTests();
     {
         const rep::Bytes pixels{80,140,210,128,0,0,0,0,255,255,255,230,10,30,60,255};
         for(auto overlay:{"none","outer_glow","lightning","starlight","sakura"}){
